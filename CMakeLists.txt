@@ -1,0 +1,91 @@
+cmake_minimum_required(VERSION 3.22)
+project(VsterAudio VERSION 0.1.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Link the MSVC runtime statically so VsterAudio.exe runs without the
+# Visual C++ Redistributable installed.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+# --- JUCE ---
+# Defaults to the git submodule (external/JUCE). Pass -DJUCE_DIR=<path> to use
+# a JUCE checkout elsewhere (the folder that contains JUCE's CMakeLists.txt).
+set(JUCE_DIR "${CMAKE_SOURCE_DIR}/external/JUCE" CACHE PATH "Path to the JUCE source tree")
+if(NOT EXISTS "${JUCE_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR
+        "JUCE not found (expected ${JUCE_DIR}/CMakeLists.txt). "
+        "Run 'git submodule update --init' to fetch external/JUCE, "
+        "or pass -DJUCE_DIR=<path to your JUCE folder>.")
+endif()
+add_subdirectory("${JUCE_DIR}" "${CMAKE_BINARY_DIR}/JUCE")
+
+# --- ASIO SDK (user-supplied; Steinberg's license forbids redistribution) ---
+# Download from https://www.steinberg.net/developers/ and unzip so that
+# ${ASIOSDK_DIR}/common/iasiodrv.h exists. Only the headers are needed.
+set(ASIOSDK_DIR "${CMAKE_SOURCE_DIR}/sdk/asiosdk" CACHE PATH "Path to the Steinberg ASIO SDK")
+option(VSTERAUDIO_ENABLE_ASIO "Enable ASIO support (requires the Steinberg ASIO SDK)" ON)
+
+set(VSTERAUDIO_USE_ASIO 0)
+if(VSTERAUDIO_ENABLE_ASIO)
+    if(EXISTS "${ASIOSDK_DIR}/common/iasiodrv.h")
+        set(VSTERAUDIO_USE_ASIO 1)
+        message(STATUS "ASIO SDK found at ${ASIOSDK_DIR} - ASIO enabled")
+    else()
+        message(WARNING
+            "ASIO SDK not found (expected ${ASIOSDK_DIR}/common/iasiodrv.h). "
+            "Building WITHOUT ASIO (WASAPI only). Download the ASIO SDK from "
+            "https://www.steinberg.net/developers/ and unzip it to sdk/asiosdk, "
+            "or pass -DASIOSDK_DIR=<path>.")
+    endif()
+endif()
+
+juce_add_gui_app(VsterAudio
+    PRODUCT_NAME "VsterAudio"
+    COMPANY_NAME "keisuke"
+    ICON_BIG "${CMAKE_SOURCE_DIR}/Assets/icon.png"
+    VERSION ${PROJECT_VERSION})
+
+juce_generate_juce_header(VsterAudio)
+
+target_sources(VsterAudio PRIVATE
+    Source/Main.cpp
+    Source/Engine/AudioEngine.cpp
+    Source/Engine/EngineCallback.cpp
+    Source/Engine/PluginChain.cpp
+    Source/Plugins/PluginHostManager.cpp
+    Source/Plugins/PluginWindowManager.cpp
+    Source/Session/SessionManager.cpp
+    Source/UI/MainComponent.cpp
+    Source/UI/PluginManagerWindow.cpp
+    Source/UI/TransportBar.cpp
+    Source/UI/ChainListComponent.cpp
+    Source/UI/SlotComponent.cpp
+    Source/UI/LevelMeterComponent.cpp)
+
+target_compile_definitions(VsterAudio PRIVATE
+    JUCE_PLUGINHOST_VST3=1
+    JUCE_PLUGINHOST_VST=0
+    JUCE_PLUGINHOST_AU=0
+    JUCE_PLUGINHOST_LV2=0
+    JUCE_ASIO=${VSTERAUDIO_USE_ASIO}
+    JUCE_WASAPI=1
+    JUCE_DIRECTSOUND=0
+    JUCE_USE_CURL=0
+    JUCE_WEB_BROWSER=0
+    JUCE_MODAL_LOOPS_PERMITTED=0
+    JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:VsterAudio,JUCE_PRODUCT_NAME>"
+    JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:VsterAudio,JUCE_VERSION>")
+
+if(VSTERAUDIO_USE_ASIO)
+    target_include_directories(VsterAudio PRIVATE "${ASIOSDK_DIR}/common")
+endif()
+
+if(MSVC)
+    target_compile_options(VsterAudio PRIVATE /utf-8)
+endif()
+
+target_link_libraries(VsterAudio PRIVATE
+    juce::juce_audio_utils
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags)

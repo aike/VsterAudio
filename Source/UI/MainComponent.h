@@ -19,6 +19,10 @@ public:
     MainComponent (AudioEngine&, PluginHostManager&, PluginWindowManager&, SessionManager&);
     ~MainComponent() override;
 
+    // Set by the application: autosaves, starts a new process that restores
+    // the session, and quits this one.
+    std::function<void()> onRestartRequested;
+
     void resized() override;
 
     // MenuBarModel (the owning window installs this as its menu bar model)
@@ -50,6 +54,7 @@ private:
     void showAudioSettings();
     void addSlot();
     void loadPluginIntoSlot (int slotId, const juce::PluginDescription&);
+    void offerRestartForPlugin (int slotId, bool detected);   // HiDPI hosting mode changed
     void clearSlot (int slotId);
     void deleteSlot (int slotId);
     void moveSlot (int slotId, int delta);

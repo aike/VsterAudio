@@ -231,7 +231,13 @@ keyboard.
 - No plugin delay compensation (there is only one path, so none is needed for alignment,
   but look-ahead plugins add latency; the total is shown in the status readout).
 - ASIO drivers are usually exclusive - the device may fail to open while a DAW is using it.
-- Some VST3 editors misbehave on HiDPI setups.
+- **HiDPI editors.** A VST3 plugin that ignores the VST3 scaling interface (BIAS FX 2, for one)
+  reports an unscaled window size but draws at the monitor's DPI, so a normal DPI-aware window
+  only shows its top-left corner. VsterAudio notices this the first time such an editor opens and
+  from then on hosts the plugin in a DPI-unaware window that Windows stretches (slightly blurry,
+  but complete). The change needs a fresh process - a plugin stays loaded until VsterAudio exits -
+  so VsterAudio offers to restart itself; the session is saved and restored across the restart.
+  The mode can also be forced per plugin from the slot menu (**Editor window scaling**).
 
 ## License
 
